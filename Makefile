@@ -13,7 +13,7 @@ all: watchdogd
 # Tool invocations
 watchdogd: src/watchdog.c
 	@echo 'Building target: $@'
-	$(CC) -o "watchdogd" src/watchdog.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o "watchdogd" src/watchdog.c
 	@echo 'Finished building target: $@'
 	@echo ' '
 
