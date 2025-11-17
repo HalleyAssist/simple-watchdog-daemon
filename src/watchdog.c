@@ -312,13 +312,13 @@ void catchSigterm(void)
 static int readMmcDevice(void)
 {
 	int mmcFd = -1;
-	unsigned char buffer[512];
+	unsigned char buffer[512] __attribute__((aligned(512)));
 	ssize_t bytesRead;
 	
 	if(mmcDevice == NULL)
 		return 1;
 	
-	mmcFd = open(mmcDevice, O_RDONLY);
+	mmcFd = open(mmcDevice, O_RDONLY | O_DIRECT);
 	if(mmcFd < 0)
 	{
 		syslog(LOG_WARNING, "Failed to open MMC device %s: %s", mmcDevice, strerror(errno));
