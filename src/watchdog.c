@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <string.h>
+#include <time.h>
 
 
 
@@ -34,9 +35,17 @@ static int fd = -1;								// Posix file descriptor
 static unsigned char daemonRunning = 1;
 static unsigned char watchdogDisarm = 0;
 
+// MMC device monitoring
+static char* mmcDevice = NULL;					// MMC device path from environment
+static time_t lastSuccessfulMmcRead = 0;		// Last successful MMC read time
+static time_t firstMmcReadAttempt = 0;			// First MMC read attempt time
+static int mmcReadRequired = 0;					// Flag to indicate if MMC reads are required
+static int mmcReadPending = 0;					// Flag to indicate a read is due/pending
+
 static int openWd(char*);
 static int pingWd(void);
 static int closeWd(void);
+static int readMmcDevice(void);
 
 void sigHandler(int signum, siginfo_t* info, void* ptr);
 void catchSigterm(void);
@@ -55,6 +64,14 @@ int main(int argc, char** argv) {
 	int opt;											// Argument buffer
 
 	catchSigterm();								// Enable SIGTERM handler
+
+	/* Check for MMC_DEVICE environment variable */
+	mmcDevice = getenv("MMC_DEVICE");
+	if(mmcDevice != NULL)
+	{
+		mmcReadRequired = 1;
+		syslog(LOG_INFO, "MMC device monitoring enabled for: %s", mmcDevice);
+	}
 
 	/* Parse argument and configure watchdog */
 	while ((opt = getopt (argc, argv, "dD:t:p:")) != -1)
@@ -117,6 +134,37 @@ int main(int argc, char** argv) {
 	/* Daemon Loop */
 	while (daemonRunning)
 	{
+		time_t currentTime = time(NULL);
+		
+		/* Check if MMC device read is required */
+		if(mmcReadRequired)
+		{
+			/* Schedule MMC read every 3 minutes (180 seconds) or if pending from failed read */
+			if(mmcReadPending || lastSuccessfulMmcRead == 0 || (currentTime - lastSuccessfulMmcRead) >= 180)
+			{
+				if(firstMmcReadAttempt == 0)
+					firstMmcReadAttempt = currentTime;
+					
+				if(readMmcDevice() == 0)
+				{
+					lastSuccessfulMmcRead = currentTime;
+					firstMmcReadAttempt = 0;  // Reset the failure timeout
+					mmcReadPending = 0;
+				}
+				else
+				{
+					mmcReadPending = 1;  // Retry on next cycle
+					
+					/* Check if we've been failing for 5 minutes (300 seconds) */
+					if((currentTime - firstMmcReadAttempt) >= 300)
+					{
+						syslog(LOG_ERR,"MMC device read failed for 5 minutes, stopping watchdog pings");
+						break;
+					}
+				}
+			}
+		}
+		
 		pingWd();
 		sleep(watchdogTimeOut);
 	}
@@ -253,4 +301,42 @@ void catchSigterm(void)
 	_sigact.sa_flags=SA_SIGINFO;
 
 	sigaction(SIGTERM, &_sigact, NULL);
+}
+/*
+ * ==============================================
+ * Name 		: readMmcDevice
+ * Return		: 0 on success, 1 on failure
+ * Brief		: Read first 512 bytes from MMC device to verify it's accessible
+ * ==============================================
+ */
+static int readMmcDevice(void)
+{
+	int mmcFd = -1;
+	unsigned char buffer[512];
+	ssize_t bytesRead;
+	
+	if(mmcDevice == NULL)
+		return 1;
+	
+	mmcFd = open(mmcDevice, O_RDONLY);
+	if(mmcFd < 0)
+	{
+		syslog(LOG_WARNING, "Failed to open MMC device %s: %s", mmcDevice, strerror(errno));
+		return 1;
+	}
+	
+	bytesRead = read(mmcFd, buffer, 512);
+	if(bytesRead < 512)
+	{
+		if(bytesRead < 0)
+			syslog(LOG_WARNING, "Failed to read from MMC device %s: %s", mmcDevice, strerror(errno));
+		else
+			syslog(LOG_WARNING, "Partial read from MMC device %s: %zd bytes", mmcDevice, bytesRead);
+		close(mmcFd);
+		return 1;
+	}
+	
+	close(mmcFd);
+	syslog(LOG_INFO, "Successfully read 512 bytes from MMC device %s", mmcDevice);
+	return 0;
 }

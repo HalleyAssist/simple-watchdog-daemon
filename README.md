@@ -46,6 +46,10 @@ Arguments :
   * -t<timeOut\>    : the watchdog will use the specified timeOut in seconds
   * -p<pidFile\>    : the watchdog will use the specified pidFile to write its PID
 
+Environment Variables :
+
+  * MMC_DEVICE : Path to MMC device to monitor (optional). When set, the daemon will read the first 512 bytes from this device every 3 minutes to verify it's accessible. If the read fails, it will retry on the next watchdog cycle. If reads fail continuously for 5 minutes, the daemon will stop pinging the watchdog, allowing the system to reset.
+
 ## Contact ##
 
 If you have any questions feel free to mail me : <antoine.braut@gmail.com>
