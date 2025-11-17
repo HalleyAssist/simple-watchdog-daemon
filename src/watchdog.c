@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
 	if(mmcDevice != NULL)
 	{
 		mmcReadRequired = 1;
-		syslog(LOG_INFO,"MMC device monitoring enabled for: %s", mmcDevice);
+		syslog(LOG_INFO, "MMC device monitoring enabled for: %s", mmcDevice);
 	}
 
 	/* Parse argument and configure watchdog */
