@@ -4,6 +4,7 @@ RM := rm -rf
 CROSS_PREFIX ?=
 DESTDIR ?= _install
 BINDIR ?= /usr/bin
+CC ?= $(CROSS_PREFIX)gcc
 
 
 # All Target
@@ -12,7 +13,7 @@ all: watchdogd
 # Tool invocations
 watchdogd: src/watchdog.c
 	@echo 'Building target: $@'
-	$(CROSS_PREFIX)gcc  -o "watchdogd" src/watchdog.c
+	$(CC) -o "watchdogd" src/watchdog.c
 	@echo 'Finished building target: $@'
 	@echo ' '
 
