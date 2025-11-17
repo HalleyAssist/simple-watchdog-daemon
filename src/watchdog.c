@@ -15,6 +15,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#define _GNU_SOURCE 			// For O_CLOEXEC and O_DIRECT
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
